@@ -98,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       -
-        if: autolatest == 'true'
+        if: inputs.autolatest == 'true'
         id: latest
         uses: dysnix/find-latest-tag@v1
         with:
