@@ -55,6 +55,10 @@ on:
       password:
         description: Docker registry password
         required: false
+    outputs:
+      version:
+        description: Docker image version (a tag)
+        value: ${{ jobs.build.outputs.version }}
 
 jobs:
   pre:
@@ -64,6 +68,7 @@ jobs:
       image: ${{ steps.set.outputs.image }}
       registry: ${{ steps.set.outputs.registry }}
       username: ${{ steps.set.outputs.username }}
+      push: ${{ steps.set.outputs.push }}
     steps:
       -
         uses: actions/github-script@v5
@@ -74,6 +79,7 @@ jobs:
             const imageRepo = '${{ github.event.repository.owner.login }}'.toLowerCase().replace(/\/docker-/, '/')
             const imageName = '${{ github.event.repository.name }}'.toLowerCase().replace(/\/docker-/, '/')
             const repoPaths = '${{ inputs.repository }}'.split('/')
+            const push = '${{ inputs.push-on-tags && startsWith(github.ref, 'refs/tags/') || inputs.push }}'
             let imageRegistry = ''
 
             // input repository first path part looks like an URL (ex. gcr.io which contains .)
@@ -89,6 +95,7 @@ jobs:
             // combine full image path
             core.setOutput('image', imagePaths.join('/'))
             core.setOutput('registry', imageRegistry)
+            core.setOutput('push', push)
 
             // autoset username for GCR
             if (imageRegistry.endsWith('gcr.io')) {
@@ -102,6 +109,9 @@ jobs:
     name: Build and Push
     runs-on: ubuntu-latest
     needs: [pre]
+
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - uses: actions/checkout@v2
@@ -136,22 +146,21 @@ jobs:
           restore-keys: |-
             ${{ runner.os }}-buildx-${{ github.event.before }}
       -
-        if: inputs.gcloud-auth != 'true'
+        if: needs.pre.outputs.push == 'true' && inputs.gcloud-auth != 'true'
         uses: docker/login-action@v1
         with:
           registry: ${{ needs.pre.outputs.registry }}
           username: ${{ needs.pre.outputs.username }}
           password: ${{ secrets.password }}
       -
-        if: inputs.gcloud-auth == 'true'
-        name: Run
+        if: needs.pre.outputs.push == 'true' && inputs.gcloud-auth == 'true'
         run: gcloud auth configure-docker --quiet
       -
         name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: ${{ inputs.context }}
-          push: ${{ inputs.push-on-tags && startsWith(github.ref, 'refs/tags/') || inputs.push }}
+          push: ${{ needs.pre.outputs.push }}
           file: ${{ inputs.file }}
           tags: |
             ${{ steps.meta.outputs.tags }}
