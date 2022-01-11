@@ -10,16 +10,17 @@ on:
         description: Docker repository name (ex. organization)
         required: false
         type: string
-      gcloud-auth:
-        description: Use gcloud CLI authentication helper (gcloud auth configure-docker)
-        required: false
-        type: boolean
       image:
         description: Docker image name (used as the part of full image, ex. repository/image)
         required: false
         type: string
-      autolatest:
+      gcloud-auth:
+        description: Use gcloud CLI authentication helper (gcloud auth configure-docker)
+        required: false
+        type: boolean
+      auto-latest:
         description: Automatically add latest tag (for the latest semver, ex. v1.2.3)
+        default: true
         required: false
         type: boolean
       push-on-tags:
@@ -55,6 +56,11 @@ on:
         description: "List of secret files to expose to the build (e.g., key=filename, MY_SECRET=./secret.txt)"
         required: false
         type: string
+      runs-on:
+        description: Specifies runs-on for the workflow jobs
+        default: ubuntu-latest
+        required: false
+        type: string
     secrets:
       password:
         description: Docker registry password
@@ -70,7 +76,7 @@ on:
 jobs:
   pre:
     name: Prepare
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     outputs:
       image: ${{ steps.set.outputs.image }}
       registry: ${{ steps.set.outputs.registry }}
@@ -114,7 +120,7 @@ jobs:
 
   build:
     name: Build and Push
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     needs: [pre]
 
     outputs:
@@ -123,7 +129,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       -
-        if: inputs.autolatest == 'true'
+        if: inputs.auto-latest == 'true'
         id: latest
         uses: dysnix/find-latest-tag@v1
         with:
